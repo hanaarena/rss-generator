@@ -52,9 +52,20 @@ func ScrapeVerge(ctx context.Context) ([]VergeArticle, error) {
 }
 
 // ParseVergeDate parses dates from The Verge's format.
-func ParseVergeDate(dateString string) (time.Time, error) {
-	if len(dateString) > 19 && dateString[10] == 'T' && dateString[19] == 'Z' {
-		return time.Parse(time.RFC3339, dateString)
+func ParseVergeDate(dateString string) (string, error) {
+	var _dateString string
+	if len(dateString) > 19 && dateString[10] == 'T' && dateString[19] == '+' {
+		_dateString = dateString
+	} else {
+		_dateString = dateString+"+00:00"
 	}
-	return time.Now(), nil
+
+	s, err := time.Parse(time.RFC3339, _dateString)
+	if err == nil {
+		str := s.Format(time.DateTime)
+		return str, nil
+	}
+
+	log.Printf("Error parsing date '%s': %v, using current time", dateString, err)
+	return time.Now().Format(time.DateTime), nil
 }

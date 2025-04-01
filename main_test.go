@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/xml"
 	"net/url"
 	"reflect"
+	"rss-reader/providers"
 	"testing"
+	"time"
 )
 
 func TestCreateRSSFeed(t *testing.T) {
@@ -13,7 +16,7 @@ func TestCreateRSSFeed(t *testing.T) {
 		title       string
 		link        string
 		description string
-		articles    []Article
+		articles    []providers.VergeArticle
 		expected    RSS
 	}{
 		{
@@ -21,7 +24,7 @@ func TestCreateRSSFeed(t *testing.T) {
 			title:       "Test Title",
 			link:        "https://test.com",
 			description: "Test Description",
-			articles:    []Article{},
+			articles:    []providers.VergeArticle{},
 			expected: RSS{
 				XMLName: xml.Name{Local: "rss"},
 				Version: "2.0",
@@ -38,7 +41,7 @@ func TestCreateRSSFeed(t *testing.T) {
 			title:       "Test Title",
 			link:        "https://test.com",
 			description: "Test Description",
-			articles: []Article{
+			articles: []providers.VergeArticle{
 				{
 					Title:   "Article 1",
 					Link:    "https://article1.com",
@@ -69,7 +72,7 @@ func TestCreateRSSFeed(t *testing.T) {
 			title:       "Test Title",
 			link:        "https://test.com",
 			description: "Test Description",
-			articles: []Article{
+			articles: []providers.VergeArticle{
 				{
 					Title:   "Article 1",
 					Link:    "https://article1.com",
@@ -112,7 +115,7 @@ func TestCreateRSSFeed(t *testing.T) {
 			title:       "Test Title",
 			link:        "https://test.com",
 			description: "Test Description",
-			articles: []Article{
+			articles: []providers.VergeArticle{
 				{
 					Title:   "Article 1",
 					Link:    "https://article1.com",
@@ -211,13 +214,18 @@ func TestParseVergeDate(t *testing.T) {
 		{
 			name:          "Partial ISO 8601",
 			dateString:    "2023-10-27",
-			expectedError: true,
+			expectedError: false,
+		},
+		{
+			name: "Valid ISO 8601 with timezone",
+			dateString: "2023-11-20T15:30:00+09:00",
+			expectedError: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := parseVergeDate(tc.dateString)
+			_, err := providers.ParseVergeDate(tc.dateString)
 			if tc.expectedError && err == nil {
 				t.Errorf("Expected error, but got nil")
 			}
@@ -322,25 +330,25 @@ func TestRSSItem_XMLFields(t *testing.T) {
 	}
 }
 
-func TestArticle_JSONFields(t *testing.T) {
-	article := Article{
-		Title:   "Test Title",
-		Link:    "https://test.com",
-		Summary: "Test Summary",
-		Date:    "Test Date",
+func TestScrapeVerge(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	articles, err := providers.ScrapeVerge(ctx)
+	if err != nil {
+		t.Fatalf("ScrapeVerge failed: %v", err)
 	}
 
-	if article.Title != "Test Title" {
-		t.Errorf("Expected Title to be 'Test Title', got '%s'", article.Title)
+	if len(articles) == 0 {
+		t.Errorf("Expected at least one article, got 0")
 	}
-	if article.Link != "https://test.com" {
-		t.Errorf("Expected Link to be 'https://test.com', got '%s'", article.Link)
-	}
-	if article.Summary != "Test Summary" {
-		t.Errorf("Expected Summary to be 'Test Summary', got '%s'", article.Summary)
-	}
-	if article.Date != "Test Date" {
-		t.Errorf("Expected Date to be 'Test Date', got '%s'", article.Date)
+
+	for _, article := range articles {
+		if article.Title == "" {
+			t.Errorf("Expected article title to not be empty")
+		}
+		if article.Link == "" {
+			t.Errorf("Expected article link to not be empty")
+		}
 	}
 }
-

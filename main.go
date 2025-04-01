@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"rss-reader/providers"
-	"strings"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -58,12 +57,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(xml.Header + string(output)) // Print RSS XML to console (you can save to a file or serve it)
+	fmt.Println(xml.Header + string(output))
 	log.Println("RSS feed generated successfully.")
 
 	http.HandleFunc("/rss.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/rss+xml")
-		w.Write([]byte(xml.Header + string(output))) // Serve the generated XML
+		w.Write([]byte(xml.Header + string(output)))
 	})
 
 	fmt.Println("Serving RSS feed at http://localhost:8080/rss.xml")
@@ -71,8 +70,7 @@ func main() {
 }
 
 func createRSSFeed(title, link, description string, articles []providers.VergeArticle) RSS {
-	now := time.Now().Format(time.RFC822) // RFC822 date format for RSS
-
+	now := time.Now().Format(time.DateTime)
 	rss := RSS{
 		XMLName: xml.Name{Local: "rss"},
 		Version: "2.0",
@@ -80,25 +78,18 @@ func createRSSFeed(title, link, description string, articles []providers.VergeAr
 			Title:       title,
 			Link:        link,
 			Description: description,
-			PubDate:     now, // Channel publication date (can be current time)
+			PubDate:     now,
 			Items:       []RSSItem{},
 		},
 	}
 
 	for _, article := range articles {
-		pubDate := now // Default to current time if article date parsing fails
+		pubDate := now
 		if article.Date != "" {
-			// Try to parse the date from the website (adjust format as needed)
-			parsedTime, err := parseVergeDate(article.Date) // Custom date parsing function
-			if err == nil {
-				pubDate = parsedTime.Format(time.RFC822)
-			} else {
-				log.Printf("Error parsing date '%s': %v, using current time", article.Date, err)
-			}
+			pubDate, _ = providers.ParseVergeDate(article.Date)
 		}
 
-		// Create GUID (unique identifier for the item, using the article link is often sufficient)
-		guidURL, _ := url.Parse(article.Link) // Handle potential parsing errors
+		guidURL, _ := url.Parse(article.Link)
 		guid := guidURL.String()
 
 		rssItem := RSSItem{
@@ -112,17 +103,4 @@ func createRSSFeed(title, link, description string, articles []providers.VergeAr
 	}
 
 	return rss
-}
-
-// parseVergeDate is a placeholder function to parse dates from The Verge's format.
-// You'll need to implement this based on how dates are presented on the website.
-// Example: "2 hours ago", "Yesterday", "Oct 26, 2023", etc.
-// This is a simplified example and might need more robust parsing.
-func parseVergeDate(dateString string) (time.Time, error) {
-	// Example: If dates are in "YYYY-MM-DDTHH:mm:ssZ" format (ISO 8601)
-	if strings.Contains(dateString, "T") { // Heuristic to check for ISO format
-		return time.Parse(time.RFC3339, dateString)
-	}
-	// Add more parsing logic for other date formats you find on The Verge
-	return time.Now(), fmt.Errorf("unsupported date format: %s", dateString) // Default to current time and error
 }
