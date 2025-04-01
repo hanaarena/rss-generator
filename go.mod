@@ -1,4 +1,4 @@
-module try_chromedp
+module rss-reader
 
 go 1.23.7
 

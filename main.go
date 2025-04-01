@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"rss-reader/providers"
 	"strings"
 	"time"
 
@@ -40,38 +41,16 @@ func main() {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 
-	var articles []Article
 	var rssFeed RSS
 
-	err := chromedp.Run(ctx,
-		chromedp.Navigate("https://www.theverge.com/"),
-		chromedp.WaitReady("#content"), // Wait for the article list to load (adjust selector if needed)
-		chromedp.Evaluate(`
-			let articles = [];
-			document.querySelectorAll('.duet--content-cards--content-card').forEach(articleElement => { // Adjust selector if needed
-				let titleElement = articleElement.querySelector('a'); // Adjust selector if needed
-				let summaryElement = articleElement.querySelector('.p-dek'); // Adjust selector if needed
-				let dateElement = articleElement.querySelector('.duet--article--timestamp time'); // Adjust selector if needed
-
-				if (titleElement) {
-					articles.push({
-						title: titleElement.innerText.trim(),
-						link: titleElement.href,
-						summary: '',
-						date: dateElement ? dateElement.getAttribute('datetime') : '',
-					});
-				}
-			});
-			articles;
-		`, &articles),
-	)
-
+	// Scrape The Verge
+	vergeArticles, err := providers.ScrapeVerge(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Create RSS Feed
-	rssFeed = createRSSFeed("The Verge", "https://www.theverge.com/", "Latest articles from The Verge", articles)
+	rssFeed = createRSSFeed("The Verge", "https://www.theverge.com/", "Latest articles from The Verge", vergeArticles)
 
 	// Marshal to XML
 	output, err := xml.MarshalIndent(rssFeed, "", "  ")
@@ -91,15 +70,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-// Article struct to hold scraped data
-type Article struct {
-	Title   string `json:"title"`
-	Link    string `json:"link"`
-	Summary string `json:"summary"`
-	Date    string `json:"date"` // Could be string or time.Time depending on parsing
-}
-
-func createRSSFeed(title, link, description string, articles []Article) RSS {
+func createRSSFeed(title, link, description string, articles []providers.VergeArticle) RSS {
 	now := time.Now().Format(time.RFC822) // RFC822 date format for RSS
 
 	rss := RSS{
