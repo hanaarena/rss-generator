@@ -21,7 +21,7 @@ func main() {
 		}
 		res := providers.GeneratedTheVergeFeed("The Verge", "https://www.theverge.com/", "Latest articles from The Verge", vergeArticles)
 
-		w.Header().Set("Content-Type", "application/rss+xml")
+		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
 		w.Write([]byte(res))
 	})
 
