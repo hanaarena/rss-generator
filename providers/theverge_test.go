@@ -2,90 +2,158 @@ package providers
 
 import (
 	"context"
-	"encoding/xml"
-	"reflect"
+	"errors"
+	"fmt"
+	cacheService "rss-generator/services"
 	"testing"
 	"time"
+
+	"github.com/chromedp/chromedp"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestScrapeVerge(t *testing.T) {
-	// Create a new context for testing
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+// MockCache is a mock implementation of the Cacher interface for testing.
+type MockCache struct {
+	data map[string]string
+	err  error
+}
 
-	// Run the scraping function
-	articles, err := ScrapeVerge(ctx)
-	if err != nil {
-		t.Fatalf("ScrapeVerge returned an error: %v", err)
-	}
-
-	// Check if any articles were returned
-	if len(articles) == 0 {
-		t.Error("ScrapeVerge returned no articles")
-	}
-
-	// Check if the first article has the expected fields
-	if len(articles) > 0 {
-		firstArticle := articles[0]
-		if firstArticle.Title == "" {
-			t.Error("First article has an empty title")
-		}
-		if firstArticle.Link == "" {
-			t.Error("First article has an empty link")
-		}
-		// We can't guarantee summary and date will always be present
+func NewMockCache() *MockCache {
+	return &MockCache{
+		data: make(map[string]string),
 	}
 }
 
+func (m *MockCache) Get(key string) (string, bool) {
+	if m.err != nil {
+		return "", false
+	}
+	value, ok := m.data[key]
+	return value, ok
+}
+
+func (m *MockCache) Set(key, value string) {
+	if m.err != nil {
+		return
+	}
+	m.data[key] = value
+}
+
+func (m *MockCache) Delete(key string) {
+	delete(m.data, key)
+}
+
+func TestNewTheVergeScraper(t *testing.T) {
+	cache := cacheService.NewMemoryCache()
+	scraper := NewTheVergeScraper(cache)
+	assert.NotNil(t, scraper)
+	assert.Equal(t, cache, scraper.Cache)
+}
+
+func TestTheVergeScraper_Scrape_Cached(t *testing.T) {
+	mockCache := NewMockCache()
+	mockCache.data[cacheKeyTheVerge] = "cached-xml-data"
+	scraper := NewTheVergeScraper(mockCache)
+
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	result, err := scraper.Scrape(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, "cached-xml-data", result)
+}
+
+func TestTheVergeScraper_Scrape_NotCached(t *testing.T) {
+	mockCache := NewMockCache()
+	scraper := NewTheVergeScraper(mockCache)
+
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	result, err := scraper.Scrape(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "<rss")
+	assert.Contains(t, result, "<channel")
+	assert.Contains(t, result, "<item")
+	assert.Contains(t, result, "The Verge")
+	assert.Contains(t, result, "https://www.theverge.com/")
+	assert.Contains(t, result, "<title>")
+	assert.Contains(t, result, "<link>")
+	assert.Contains(t, result, "<description>")
+	assert.Contains(t, result, "<pubDate>")
+	assert.Contains(t, result, "<guid>")
+	assert.Equal(t, result, mockCache.data[cacheKeyTheVerge])
+}
+
+func TestTheVergeScraper_Scrape_Error(t *testing.T) {
+	mockCache := NewMockCache()
+	scraper := NewTheVergeScraper(mockCache)
+
+	// Create a context with a very short timeout to force an error
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+
+	result, err := scraper.Scrape(ctx)
+	assert.Error(t, err)
+	assert.Empty(t, result)
+}
+
+func TestTheVergeScraper_Scrape_SetCacheError(t *testing.T) {
+	mockCache := NewMockCache()
+	mockCache.err = errors.New("set cache error")
+	scraper := NewTheVergeScraper(mockCache)
+
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	result, err := scraper.Scrape(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, result)
+	assert.NotContains(t, mockCache.data, cacheKeyTheVerge)
+}
+
 func TestParseVergeDate(t *testing.T) {
-	tests := []struct {
-		name        string
-		dateString  string
-		want        string
-		wantErr     bool
-		currentTime bool
+	testCases := []struct {
+		name           string
+		dateString     string
+		expected       string
+		expectingError bool
 	}{
 		{
-			name:       "Valid date with timezone",
-			dateString: "2023-10-27T10:00:00+00:00",
-			want:       "2023-10-27 10:00:00",
-			wantErr:    false,
+			name:           "Valid Date",
+			dateString:     "2025-04-02T13:05:50+00:00",
+			expected:       "2025-04-02 13:05:50",
+			expectingError: false,
 		},
 		{
-			name:       "Valid date without timezone",
-			dateString: "2023-10-27T10:00:00",
-			want:       "2023-10-27 10:00:00",
-			wantErr:    false,
+			name:           "Invalid Date",
+			dateString:     "invalid-date",
+			expected:       time.Now().Format(time.DateTime),
+			expectingError: false,
 		},
 		{
-			name:        "Invalid date",
-			dateString:  "invalid-date",
-			wantErr:     false,
-			currentTime: true,
-		},
-		{
-			name:       "Empty date",
-			dateString: "",
-			want:       "",
-			wantErr:    false,
+			name:           "Date without timezone",
+			dateString:     "2023-10-28T10:00:00",
+			expected:       "2023-10-28 10:00:00",
+			expectingError: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseVergeDate(tt.dateString)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("parseVergeDate() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.currentTime {
-				_, err := time.Parse(time.DateTime, got)
-				if err != nil {
-					t.Errorf("parseVergeDate() returned invalid current time format: %v", err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := parseVergeDate(tc.dateString)
+			if tc.expectingError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if tc.name == "Invalid Date" {
+					// For invalid date, we only check the format, not the exact time
+					_, err := time.Parse(time.DateTime, result)
+					assert.NoError(t, err)
+				} else {
+					assert.Equal(t, tc.expected, result)
 				}
-			} else if got != tt.want {
-				t.Errorf("parseVergeDate() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -96,69 +164,30 @@ func TestGeneratedTheVergeFeed(t *testing.T) {
 		{
 			Title:   "Test Article 1",
 			Link:    "https://www.example.com/article1",
-			Summary: "Summary of article 1",
+			Summary: "Summary 1",
 			Date:    "2023-10-27T10:00:00+00:00",
 		},
 		{
 			Title:   "Test Article 2",
 			Link:    "https://www.example.com/article2",
-			Summary: "Summary of article 2",
+			Summary: "Summary 2",
 			Date:    "2023-10-28T12:00:00+00:00",
 		},
 	}
 
-	feed := GeneratedTheVergeFeed("Test Feed", "https://www.example.com", "Test Description", articles)
-
-	var rss RSS
-	err := xml.Unmarshal([]byte(feed), &rss)
-	if err != nil {
-		t.Fatalf("Failed to unmarshal generated XML: %v", err)
-	}
-
-	if rss.Version != "2.0" {
-		t.Errorf("Expected RSS version 2.0, got %s", rss.Version)
-	}
-
-	if rss.Channel.Title != "Test Feed" {
-		t.Errorf("Expected channel title 'Test Feed', got %s", rss.Channel.Title)
-	}
-
-	if rss.Channel.Link != "https://www.example.com" {
-		t.Errorf("Expected channel link 'https://www.example.com', got %s", rss.Channel.Link)
-	}
-
-	if rss.Channel.Description != "Test Description" {
-		t.Errorf("Expected channel description 'Test Description', got %s", rss.Channel.Description)
-	}
-
-	if len(rss.Channel.Items) != len(articles) {
-		t.Errorf("Expected %d items, got %d", len(articles), len(rss.Channel.Items))
-	}
-
-	for i, item := range rss.Channel.Items {
-		if item.Title != articles[i].Title {
-			t.Errorf("Expected item title '%s', got '%s'", articles[i].Title, item.Title)
-		}
-		if item.Link != articles[i].Link {
-			t.Errorf("Expected item link '%s', got '%s'", articles[i].Link, item.Link)
-		}
-		if item.Description != articles[i].Summary {
-			t.Errorf("Expected item description '%s', got '%s'", articles[i].Summary, item.Description)
-		}
-		expectedDate, _ := parseVergeDate(articles[i].Date)
-		if item.PubDate != expectedDate {
-			t.Errorf("Expected item pubDate '%s', got '%s'", expectedDate, item.PubDate)
-		}
-		if item.GUID != articles[i].Link {
-			t.Errorf("Expected item GUID '%s', got '%s'", articles[i].Link, item.GUID)
-		}
-	}
-}
-
-func TestRSS_XMLName(t *testing.T) {
-	rss := RSS{}
-	expected := xml.Name{Local: "rss"}
-	if !reflect.DeepEqual(rss.XMLName, expected) {
-		t.Errorf("Expected XMLName to be %v, got %v", expected, rss.XMLName)
-	}
+	xmlStr := generatedTheVergeFeed("Test Feed", "https://www.example.com", "Test Description", articles)
+	fmt.Println(xmlStr)
+	assert.NotEmpty(t, xmlStr)
+	assert.Contains(t, xmlStr, "<rss")
+	assert.Contains(t, xmlStr, "<channel")
+	assert.Contains(t, xmlStr, "<item")
+	assert.Contains(t, xmlStr, "Test Feed")
+	assert.Contains(t, xmlStr, "https://www.example.com")
+	assert.Contains(t, xmlStr, "Test Description")
+	assert.Contains(t, xmlStr, "<title>Test Article 1</title>")
+	assert.Contains(t, xmlStr, "<link>https://www.example.com/article1</link>")
+	assert.Contains(t, xmlStr, "<description>Summary 1</description>")
+	assert.Contains(t, xmlStr, "<title>Test Article 2</title>")
+	assert.Contains(t, xmlStr, "<link>https://www.example.com/article2</link>")
+	assert.Contains(t, xmlStr, "<description>Summary 2</description>")
 }

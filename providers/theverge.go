@@ -102,7 +102,7 @@ func (s *TheVergeScraper) Scrape(ctx context.Context) (string, error) {
 
 // parseVergeDate parses dates from The Verge's format.
 func parseVergeDate(dateString string) (string, error) {
-	var _dateString string
+	var _dateString = dateString
 	if len(dateString) <= 19 || dateString[10] != 'T' || dateString[19] != '+' {
 		_dateString = dateString + "+00:00"
 	}
