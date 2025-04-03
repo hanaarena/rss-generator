@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"rss-generator/providers"
+	cacheService "rss-generator/services"
 
 	"github.com/chromedp/chromedp"
 )
@@ -13,16 +14,17 @@ import (
 func main() {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
+	cache := cacheService.NewMemoryCache()
 
 	http.HandleFunc("/theverge/rss.xml", func(w http.ResponseWriter, r *http.Request) {
-		vergeArticles, err := providers.ScrapeVerge(ctx)
+		scraper := providers.NewTheVergeScraper(cache)
+		xmlStr, err := scraper.Scrape(ctx)
 		if err != nil {
 			log.Fatal(err)
 		}
-		res := providers.GeneratedTheVergeFeed("The Verge", "https://www.theverge.com/", "Latest articles from The Verge", vergeArticles)
 
 		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-		w.Write([]byte(res))
+		w.Write([]byte(xmlStr))
 	})
 
 	fmt.Println("Serving RSS feed at http://localhost:8080")

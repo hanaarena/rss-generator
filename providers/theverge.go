@@ -6,9 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	cacheService "rss-generator/services"
 	"time"
 
 	"github.com/chromedp/chromedp"
+)
+
+const (
+	cacheKeyTheVerge = "rss-theverge"
 )
 
 // VergeArticle struct to hold scraped data from The Verge
@@ -41,8 +46,21 @@ type RSSItem struct {
 	GUID        string `xml:"guid"`
 }
 
-// ScrapeVerge scrapes articles from The Verge
-func ScrapeVerge(ctx context.Context) ([]VergeArticle, error) {
+type TheVergeScraper struct {
+	Cache cacheService.Cacher // Interface for the cache
+}
+
+func NewTheVergeScraper(cache cacheService.Cacher) *TheVergeScraper {
+	return &TheVergeScraper{Cache: cache}
+}
+
+// Scrape scrapes articles from The Verge
+func (s *TheVergeScraper) Scrape(ctx context.Context) (string, error) {
+	cacheContent, haveCached := s.Cache.Get(cacheKeyTheVerge)
+	if haveCached {
+		fmt.Printf("Hit `%s` cache", cacheKeyTheVerge)
+		return cacheContent, nil
+	}
 	var articles []VergeArticle
 
 	fmt.Println("Star scraping The Verge...")
@@ -71,18 +89,21 @@ func ScrapeVerge(ctx context.Context) ([]VergeArticle, error) {
 
 	if err != nil {
 		log.Println("Error scraping The Verge:", err)
-		return nil, err
+		return "", err
 	}
 
-	return articles, nil
+	xmlStr := generatedTheVergeFeed("The Verge", "https://www.theverge.com/", "Latest articles from The Verge", articles)
+	defer func() {
+		s.Cache.Set(cacheKeyTheVerge, xmlStr)
+	}()
+
+	return xmlStr, nil
 }
 
 // parseVergeDate parses dates from The Verge's format.
 func parseVergeDate(dateString string) (string, error) {
 	var _dateString string
-	if len(dateString) > 19 && dateString[10] == 'T' && dateString[19] == '+' {
-		_dateString = dateString
-	} else {
+	if len(dateString) <= 19 || dateString[10] != 'T' || dateString[19] != '+' {
 		_dateString = dateString + "+00:00"
 	}
 
@@ -96,7 +117,7 @@ func parseVergeDate(dateString string) (string, error) {
 	return time.Now().Format(time.DateTime), nil
 }
 
-func GeneratedTheVergeFeed(title, link, description string, articles []VergeArticle) string {
+func generatedTheVergeFeed(title, link, description string, articles []VergeArticle) string {
 	now := time.Now().Format(time.DateTime)
 	rss := RSS{
 		XMLName: xml.Name{Local: "rss"},
@@ -136,7 +157,7 @@ func GeneratedTheVergeFeed(title, link, description string, articles []VergeArti
 
 	result := xml.Header + string(output)
 	fmt.Println(result)
-	log.Println("RSS feed generated successfully.")
+	log.Println("The Verge RSS feed generated successfully.")
 
 	return result
 }
