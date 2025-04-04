@@ -37,6 +37,17 @@ func main() {
 		w.Write([]byte(xmlStr))
 	})
 
+	http.HandleFunc("/freecodecamp/rss.xml", func(w http.ResponseWriter, r *http.Request) {
+		scraper := providers.NewFreeCodeCampScraper(cache)
+		xmlStr, err := scraper.Scrape(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
+		w.Write([]byte(xmlStr))
+	})
+
 	fmt.Println("Serving RSS feed at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
