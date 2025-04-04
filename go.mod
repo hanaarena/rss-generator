@@ -4,6 +4,7 @@ go 1.23.7
 
 require (
 	github.com/chromedp/chromedp v0.13.3
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.10.0
 )
 

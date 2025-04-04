@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	cacheService "rss-generator/services"
+	cacheService "rss-generator/services/cache"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -55,9 +55,9 @@ func NewTheVergeScraper(cache cacheService.Cacher) *TheVergeScraper {
 }
 
 // Scrape scrapes articles from The Verge
-func (s *TheVergeScraper) Scrape(ctx context.Context) (string, error) {
+func (s *TheVergeScraper) Scrape(ctx context.Context, isJob ...string) (string, error) {
 	cacheContent, haveCached := s.Cache.Get(cacheKeyTheVerge)
-	if haveCached {
+	if haveCached && len(isJob) == 0 {
 		fmt.Printf("Hit `%s` cache", cacheKeyTheVerge)
 		return cacheContent, nil
 	}

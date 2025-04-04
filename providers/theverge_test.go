@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	cacheService "rss-generator/services"
+	cacheService "rss-generator/services/cache"
 	"testing"
 	"time"
 

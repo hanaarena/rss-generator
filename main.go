@@ -6,7 +6,8 @@ import (
 	"log"
 	"net/http"
 	"rss-generator/providers"
-	cacheService "rss-generator/services"
+	cacheService "rss-generator/services/cache"
+	cronService "rss-generator/services/cron"
 
 	"github.com/chromedp/chromedp"
 )
@@ -15,6 +16,15 @@ func main() {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 	cache := cacheService.NewMemoryCache()
+
+	// start the cron service
+	theVergeScraper := providers.NewTheVergeScraper(cache)
+	cronService := cronService.NewCronService(theVergeScraper)
+	err := cronService.AddTheVergeJob()
+	if err != nil {
+		log.Fatalf("Failed to add The Verge job: %v", err)
+	}
+	cronService.Start()
 
 	http.HandleFunc("/theverge/rss.xml", func(w http.ResponseWriter, r *http.Request) {
 		scraper := providers.NewTheVergeScraper(cache)
