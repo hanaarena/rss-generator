@@ -8,6 +8,7 @@ import (
 	"rss-generator/providers"
 	cacheService "rss-generator/services/cache"
 	cronService "rss-generator/services/cron"
+	"strings"
 
 	"github.com/chromedp/chromedp"
 )
@@ -36,36 +37,53 @@ func main() {
 	scrapers := []struct {
 		name    string
 		scraper providers.Scraper
-	}{{name: "The Verge", scraper: vergeScraper}, {name: "FreeCodeCamp", scraper: freeCodeCampScraper}}
+	}{
+		{name: "The Verge", scraper: vergeScraper},
+		{name: "FreeCodeCamp", scraper: freeCodeCampScraper},
+	}
 	for _, s := range scrapers {
 		log.Printf("Running %s job immediately on startup...", s.name)
-		if _, err := s.scraper.Scrape(ctx); err != nil {
+		if _, err := s.scraper.Scrape(ctx, "true"); err != nil {
 			log.Printf("Error running %s job on startup: %v", s.name, err)
 		} else {
 			log.Printf("%s job completed successfully on startup.", s.name)
 		}
 	}
 
-	http.HandleFunc("/theverge/rss.xml", func(w http.ResponseWriter, r *http.Request) {
-		scraper := providers.NewTheVergeScraper(cache)
-		xmlStr, err := scraper.Scrape(ctx)
-		if err != nil {
-			log.Fatal(err)
+	// Define a map of provider names to scraper factories
+	scraperFactories := map[string]func(cacheService.Cacher) providers.Scraper{
+		"theverge":     func(cache cacheService.Cacher) providers.Scraper { return providers.NewTheVergeScraper(cache) },
+		"freecodecamp": func(cache cacheService.Cacher) providers.Scraper { return providers.NewFreeCodeCampScraper(cache) },
+	}
+
+	http.HandleFunc("/reader/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract the provider name from the URL path
+		parts := strings.Split(r.URL.Path, "/")
+		if len(parts) >= 4 && parts[len(parts)-1] == "rss.xml" {
+			providerName := parts[len(parts)-2]
+
+			// Check if the provider is supported
+			factory, ok := scraperFactories[providerName]
+			if !ok {
+				http.NotFound(w, r)
+				return
+			}
+
+			// Create the scraper for the provider
+			scraper := factory(cache)
+			xmlStr, err := scraper.Scrape(ctx)
+			if err != nil {
+				log.Printf("Error scraping %s: %v", providerName, err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+
+			// Write the RSS XML to the response
+			w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
+			w.Write([]byte(xmlStr))
+			return
 		}
-
-		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-		w.Write([]byte(xmlStr))
-	})
-
-	http.HandleFunc("/freecodecamp/rss.xml", func(w http.ResponseWriter, r *http.Request) {
-		scraper := providers.NewFreeCodeCampScraper(cache)
-		xmlStr, err := scraper.Scrape(ctx)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-		w.Write([]byte(xmlStr))
+		http.NotFound(w, r)
 	})
 
 	fmt.Println("Serving RSS feed at http://localhost:8080")
