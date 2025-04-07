@@ -56,7 +56,7 @@ func main() {
 		"freecodecamp": func(cache cacheService.Cacher) providers.Scraper { return providers.NewFreeCodeCampScraper(cache) },
 	}
 
-	http.HandleFunc("/reader/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/feed/", func(w http.ResponseWriter, r *http.Request) {
 		// Extract the provider name from the URL path
 		parts := strings.Split(r.URL.Path, "/")
 		if len(parts) >= 4 && parts[len(parts)-1] == "rss.xml" {
