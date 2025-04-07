@@ -18,10 +18,10 @@ const (
 
 // FreeCodeCampArticle struct to hold scraped data from FreeCodeCamp
 type FreeCodeCampArticle struct {
-	Title   string `json:"title"`
-	Link    string `json:"link"`
-	Tag     string `json:"tag"`
-	Date    string `json:"date"`
+	Title string `json:"title"`
+	Link  string `json:"link"`
+	Tag   string `json:"tag"`
+	Date  string `json:"date"`
 }
 
 type FreeCodeCampScraper struct {
@@ -95,7 +95,7 @@ func parseFreeCodeCampDate(dateString string) (string, error) {
 	// Get the timezone offset in hours
 	_, offset := localTime.Zone()
 	// Convert seconds to hours
-	offsetHours := offset / 3600 
+	offsetHours := offset / 3600
 
 	// Format the time as "2006-01-02 15:04:05 GMT+9"
 	formattedTime := localTime.Format("2006-01-02 15:04:05") + fmt.Sprintf(" GMT%+d", offsetHours)

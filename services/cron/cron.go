@@ -4,21 +4,21 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"rss-generator/providers" // Import your providers package
+	"rss-generator/providers"
 	"time"
 
 	"github.com/robfig/cron/v3"
 )
 
 type CronService struct {
-	cron *cron.Cron
-	theVergeScraper *providers.TheVergeScraper
+	cron    *cron.Cron
+	scraper providers.Scraper
 }
 
-func NewCronService(theVergeScraper *providers.TheVergeScraper) *CronService {
+func NewCronService(scraper providers.Scraper) *CronService {
 	return &CronService{
-		cron: cron.New(cron.WithSeconds()),
-		theVergeScraper: theVergeScraper,
+		cron:    cron.New(cron.WithSeconds()),
+		scraper: scraper,
 	}
 }
 
@@ -33,23 +33,41 @@ func (s *CronService) Stop() {
 	log.Println("Cron service stopped.")
 }
 
-func (s *CronService) AddTheVergeJob() error {
-	// Run every day at 00:00
-	// See https://pkg.go.dev/github.com/robfig/cron/v3#hdr-CRON_Expression_Format
-	_, err := s.cron.AddFunc("0 0 0 * * *", func() {
-		log.Println("Running The Verge job...")
+func (s *CronService) SetScraper(scraper providers.Scraper) {
+	s.scraper = scraper
+}
+
+func (s *CronService) addJob(name string, jobFunc func(ctx context.Context) error) error {
+	_, err := s.cron.AddFunc("0 0 0 * * *", func() { // Run every day at 00:00
+		log.Printf("Running %s job...", name)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		_, err := s.theVergeScraper.Scrape(ctx, "true")
+		err := jobFunc(ctx)
 		if err != nil {
-			log.Printf("Error scraping The Verge: %v", err)
+			log.Printf("Error running %s job: %v", name, err)
 		} else {
-			log.Printf("The Verge job completed at %s", time.Now().Format(time.DateTime))
+			log.Printf("%s job completed at %s", name, time.Now().Format(time.DateTime))
+
 		}
 	})
 	if err != nil {
-		return fmt.Errorf("error adding The Verge job: %w", err)
+		return fmt.Errorf("error adding %s job: %w", name, err)
 	}
-	log.Println("The Verge job added to cron.")
+	log.Printf("%s job added to cron.", name)
 	return nil
+
+}
+
+func (s *CronService) AddTheVergeJob() error {
+	return s.addJob("The Verge", func(ctx context.Context) error {
+		_, err := s.scraper.Scrape(ctx, "true")
+		return err
+	})
+}
+
+func (s *CronService) AddFreeCodeCampJob() error {
+	return s.addJob("FreeCodeCamp", func(ctx context.Context) error {
+		_, err := s.scraper.Scrape(ctx, "true")
+		return err
+	})
 }
