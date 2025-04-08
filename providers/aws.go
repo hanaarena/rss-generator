@@ -122,7 +122,6 @@ func generatedAWSFeed(title, link, description string, articles []AWSArticle) st
 	}
 
 	result := xml.Header + string(output)
-	fmt.Println(result)
 	log.Println("AWS Blogs RSS feed generated successfully.")
 
 	return result

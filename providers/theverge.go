@@ -157,7 +157,6 @@ func generatedTheVergeFeed(title, link, description string, articles []VergeArti
 	}
 
 	result := xml.Header + string(output)
-	fmt.Println(result)
 	log.Println("The Verge RSS feed generated successfully.")
 
 	return result

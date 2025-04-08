@@ -143,7 +143,6 @@ func generatedFreeCodeCampFeed(title, link, description string, articles []FreeC
 	}
 
 	result := xml.Header + string(output)
-	fmt.Println(result)
 	log.Println("FreeCodeCamp RSS feed generated successfully.")
 
 	return result
