@@ -68,7 +68,7 @@ func (s *TheVergeScraper) Scrape(ctx context.Context, isJob ...string) (string, 
 
 	err := chromedp.Run(ctx,
 		chromedp.Navigate("https://www.theverge.com/"),
-		chromedp.WaitReady("#content"),
+		chromedp.WaitReady(".duet--page-layout--homepage"),
 		chromedp.Evaluate(`
 			let articles = [];
 			document.querySelectorAll('.duet--content-cards--content-card').forEach(articleElement => {
