@@ -9,6 +9,7 @@ import (
 	cacheService "rss-generator/services/cache"
 	cronService "rss-generator/services/cron"
 	"strings"
+	"sync"
 
 	"github.com/chromedp/chromedp"
 )
@@ -53,17 +54,31 @@ func main() {
 	}{
 		{name: "The Verge", scraper: vergeScraper},
 		{name: "FreeCodeCamp", scraper: freeCodeCampScraper},
-		{name: "AWS", scraper: awsScraper},
+		{name: "AWS-Blog", scraper: awsScraper},
 		{name: "CSS-Tricks", scraper: cssTricksScraper},
 	}
+
+	// Run all scrapers asynchronously on startup
+	var wg sync.WaitGroup
 	for _, s := range scrapers {
-		log.Printf("Running %s job immediately on startup...", s.name)
-		if _, err := s.scraper.Scrape(ctx); err != nil {
-			log.Printf("Error running %s job on startup: %v", s.name, err)
-		} else {
-			log.Printf("%s job completed successfully on startup.", s.name)
-		}
+		wg.Add(1)
+		go func(s struct {
+			name    string
+			scraper providers.Scraper
+		}) {
+			defer wg.Done()
+			// Create a new context for each goroutine
+			ctx, cancel := chromedp.NewContext(context.Background())
+			defer cancel()
+			log.Printf("Running %s job immediately on startup...", s.name)
+			if _, err := s.scraper.Scrape(ctx); err != nil {
+				log.Printf("Error running %s job on startup: %v", s.name, err)
+			} else {
+				log.Printf("%s job completed successfully on startup.", s.name)
+			}
+		}(s)
 	}
+	wg.Wait()
 
 	// Define a map of provider names to scraper factories
 	scraperFactories := map[string]func(cacheService.Cacher) providers.Scraper{

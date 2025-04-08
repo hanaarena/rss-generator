@@ -80,7 +80,7 @@ func (s *CronService) AddAWSJob() error {
 }
 
 func (s *CronService) AddCSSTricksJob() error {
-	return s.addJob("AWS-Blog", func(ctx context.Context) error {
+	return s.addJob("CSS-Tricks", func(ctx context.Context) error {
 		_, err := s.scraper.Scrape(ctx, "true")
 		return err
 	})
