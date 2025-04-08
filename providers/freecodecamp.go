@@ -83,24 +83,22 @@ func parseFreeCodeCampDate(dateString string) (string, error) {
 	s, err := time.Parse(time.RFC3339, dateString)
 	if err != nil {
 		fmt.Println("Failed to parse time:", err)
-		return "", err
+		return dateString, err
 	}
 
 	loc, err := time.LoadLocation("Asia/Tokyo") // use (GMT+9) here
 	if err != nil {
 		fmt.Println("Failed to load timezone:", err)
-		return "", err
+		return dateString, err
 	}
 	localTime := s.In(loc)
 	// Get the timezone offset in hours
 	_, offset := localTime.Zone()
 	// Convert seconds to hours
 	offsetHours := offset / 3600
-
 	// Format the time as "2006-01-02 15:04:05 GMT+9"
 	formattedTime := localTime.Format("2006-01-02 15:04:05") + fmt.Sprintf(" GMT%+d", offsetHours)
 
-	log.Printf("Error parsing date '%s': %v, using current time", dateString, err)
 	return formattedTime, nil
 }
 
