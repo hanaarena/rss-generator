@@ -21,6 +21,7 @@ func main() {
 	// start the cron service
 	vergeScraper := providers.NewTheVergeScraper(cache)
 	freeCodeCampScraper := providers.NewFreeCodeCampScraper(cache)
+	awsScraper := providers.NewAWSSraper(cache)
 	cronService := cronService.NewCronService(vergeScraper)
 	err := cronService.AddTheVergeJob()
 	if err != nil {
@@ -31,6 +32,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to add FreeCodeCamp job: %v", err)
 	}
+	cronService.SetScraper(awsScraper)
+	err = cronService.AddAWSJob()
+	if err != nil {
+		log.Fatalf("Failed to add AWS job: %v", err)
+	}
 	cronService.Start()
 
 	// Run the job when server up
@@ -40,10 +46,11 @@ func main() {
 	}{
 		{name: "The Verge", scraper: vergeScraper},
 		{name: "FreeCodeCamp", scraper: freeCodeCampScraper},
+		{name: "AWS", scraper: awsScraper},
 	}
 	for _, s := range scrapers {
 		log.Printf("Running %s job immediately on startup...", s.name)
-		if _, err := s.scraper.Scrape(ctx, "true"); err != nil {
+		if _, err := s.scraper.Scrape(ctx); err != nil {
 			log.Printf("Error running %s job on startup: %v", s.name, err)
 		} else {
 			log.Printf("%s job completed successfully on startup.", s.name)
@@ -54,6 +61,7 @@ func main() {
 	scraperFactories := map[string]func(cacheService.Cacher) providers.Scraper{
 		"theverge":     func(cache cacheService.Cacher) providers.Scraper { return providers.NewTheVergeScraper(cache) },
 		"freecodecamp": func(cache cacheService.Cacher) providers.Scraper { return providers.NewFreeCodeCampScraper(cache) },
+		"aws":          func(cache cacheService.Cacher) providers.Scraper { return providers.NewAWSSraper(cache) },
 	}
 
 	http.HandleFunc("/feed/", func(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +94,6 @@ func main() {
 		http.NotFound(w, r)
 	})
 
-	fmt.Println("Serving RSS feed at http://localhost:8080")
+	fmt.Println("Running server at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

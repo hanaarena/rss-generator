@@ -34,6 +34,7 @@ func NewFreeCodeCampScraper(cache cacheService.Cacher) *FreeCodeCampScraper {
 
 // Scrape scrapes articles from FreeCodeCamp
 func (s *FreeCodeCampScraper) Scrape(ctx context.Context, isJob ...string) (string, error) {
+	fmt.Println("Star scraping FreeCodeCamp...")
 	cacheContent, haveCached := s.Cache.Get(cacheKeyFreeCodeCamp)
 	if haveCached && len(isJob) == 0 {
 		fmt.Printf("Hit `%s` cache\n", cacheKeyFreeCodeCamp)
@@ -41,7 +42,6 @@ func (s *FreeCodeCampScraper) Scrape(ctx context.Context, isJob ...string) (stri
 	}
 	var articles []FreeCodeCampArticle
 
-	fmt.Println("Start scraping FreeCodeCamp...")
 	err := chromedp.Run(ctx,
 		chromedp.Navigate("https://www.freecodecamp.org/news/"),
 		chromedp.WaitReady(".post-feed"),

@@ -44,6 +44,7 @@ type RSSItem struct {
 	Description string `xml:"description"`
 	PubDate     string `xml:"pubDate"`
 	GUID        string `xml:"guid"`
+	Author      string `xml:"author"`
 }
 
 type TheVergeScraper struct {
@@ -56,6 +57,7 @@ func NewTheVergeScraper(cache cacheService.Cacher) *TheVergeScraper {
 
 // Scrape scrapes articles from The Verge
 func (s *TheVergeScraper) Scrape(ctx context.Context, isJob ...string) (string, error) {
+	fmt.Println("Star scraping The Verge...")
 	cacheContent, haveCached := s.Cache.Get(cacheKeyTheVerge)
 	if haveCached && len(isJob) == 0 {
 		fmt.Printf("Hit `%s` cache", cacheKeyTheVerge)
@@ -63,7 +65,6 @@ func (s *TheVergeScraper) Scrape(ctx context.Context, isJob ...string) (string, 
 	}
 	var articles []VergeArticle
 
-	fmt.Println("Star scraping The Verge...")
 	err := chromedp.Run(ctx,
 		chromedp.Navigate("https://www.theverge.com/"),
 		chromedp.WaitReady("#content"),
