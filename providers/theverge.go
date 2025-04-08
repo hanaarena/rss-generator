@@ -45,6 +45,7 @@ type RSSItem struct {
 	PubDate     string `xml:"pubDate"`
 	GUID        string `xml:"guid"`
 	Author      string `xml:"author"`
+	Category    string `xml:"category"`
 }
 
 type TheVergeScraper struct {

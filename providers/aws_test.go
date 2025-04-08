@@ -84,16 +84,16 @@ func TestAWSSraper_Scrape_SetCacheError(t *testing.T) {
 func TestGeneratedAWSFeed(t *testing.T) {
 	articles := []AWSArticle{
 		{
-			Title:   "Test Article 1",
-			Link:    "https://www.example.com/article1",
+			Title:       "Test Article 1",
+			Link:        "https://www.example.com/article1",
 			Description: "Summary 1",
-			Date:    "October 27, 2023",
+			Date:        "October 27, 2023",
 		},
 		{
-			Title:   "Test Article 2",
-			Link:    "https://www.example.com/article2",
+			Title:       "Test Article 2",
+			Link:        "https://www.example.com/article2",
 			Description: "Summary 2",
-			Date:    "Jan 2, 2023",
+			Date:        "Jan 2, 2023",
 		},
 	}
 
