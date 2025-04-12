@@ -85,3 +85,10 @@ func (s *CronService) AddCSSTricksJob() error {
 		return err
 	})
 }
+
+func (s *CronService) AddNodeWeeklyJob() error {
+	return s.addJob("NodeWeekly", func(ctx context.Context) error {
+		_, err := s.scraper.Scrape(ctx, "true")
+		return err
+	})
+}

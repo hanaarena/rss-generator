@@ -24,6 +24,7 @@ func main() {
 	freeCodeCampScraper := providers.NewFreeCodeCampScraper(cache)
 	awsScraper := providers.NewAWSSraper(cache)
 	cssTricksScraper := providers.NewCSSTricksScraper(cache)
+	nodeWeeklyScraper := providers.NewNodeWeeklyScraper(cache)
 
 	cronService := cronService.NewCronService(vergeScraper)
 	err := cronService.AddTheVergeJob()
@@ -45,6 +46,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to add CSS-Tricks job: %v", err)
 	}
+	cronService.SetScraper(nodeWeeklyScraper)
+	err = cronService.AddNodeWeeklyJob()
+	if err != nil {
+		log.Fatalf("Failed to add NodeWeekly job: %v", err)
+	}
 	cronService.Start()
 
 	// Run the job when server up
@@ -56,6 +62,7 @@ func main() {
 		{name: "FreeCodeCamp", scraper: freeCodeCampScraper},
 		{name: "AWS-Blog", scraper: awsScraper},
 		{name: "CSS-Tricks", scraper: cssTricksScraper},
+		{name: "NodeWeekly", scraper: nodeWeeklyScraper},
 	}
 
 	// Run all scrapers asynchronously on startup
@@ -86,6 +93,7 @@ func main() {
 		"freecodecamp": func(cache cacheService.Cacher) providers.Scraper { return providers.NewFreeCodeCampScraper(cache) },
 		"aws":          func(cache cacheService.Cacher) providers.Scraper { return providers.NewAWSSraper(cache) },
 		"csstricks":    func(cache cacheService.Cacher) providers.Scraper { return providers.NewCSSTricksScraper(cache) },
+		"nodeweekly":   func(cache cacheService.Cacher) providers.Scraper { return providers.NewNodeWeeklyScraper(cache) },
 	}
 
 	http.HandleFunc("/feed/", func(w http.ResponseWriter, r *http.Request) {
